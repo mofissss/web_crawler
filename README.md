@@ -1,2 +1,2 @@
 # Web Crawler
-Web Crawler is a learning project that is a search spider. It allows you to crawl web pages with the necessary depth, collect and index words from each page. Then make a request and get a ranked list of sites according to the frequency of mentioning words from the query and the PageRank algorithm.
+Web Crawler - это учебный проект, представляющий поискового паука. Он позволяет сканировать веб-страницы с необходимой глубиной, собирать и индексировать слова с каждой страницы. Затем делать запросы и получать ранжированный список сайтов в соответствии с частотой упоминания слов из запроса и алгоритмом PageRank.
