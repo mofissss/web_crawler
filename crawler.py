@@ -1,4 +1,4 @@
-import re
+import bs4
 import requests
 from bs4 import BeautifulSoup
 import sqlite3
@@ -14,20 +14,23 @@ class Crawler:
         cursor: sqlite3.Cursor - интерфейс для перемещения по БД
 
     Методы:
-        __init__(self, db_file_name, init_db) - инициализация паука и БД, открытие соединения с БД
-        __del__(self) - закрытие соединения с БД
-        dbcommit(self) - зафиксировать изменения в БД
+        __init__(self, db_file_name, init_db) - инициализирует паука и открывает соединение с БД
+        __del__(self) - закрывает соединение с БД
+        dbcommit(self) - фиксирует изменения в БД
+        dbinit(self) - создаёт базу данных
         crawl(self, url_list, max_depth=1) - обход страниц в ширину по заданной глубине, сбор и индексация данных
-        dbinit(self) - создать БД
+        get_url_html(self, html_code) - парсит HTML-код, удаляет лишние тэги и возвращает готовый HTML-код
+        get_url_text(self, soup) - получает текст страницы и возвращает его в виде списка
+        add_index(self, url_text, url) - индексирует страницу
     """
 
     def __init__(self, db_file_name: str, *args: list, init_db: bool = False) -> None:
         """
         Инициализирует паука и открывает соединение с БД
 
-            Параметры:
-                db_file_name: str - имя БД
-                init_db: bool - флаг для создания БД
+        Параметры:
+            db_file_name: str - имя БД
+            init_db: bool - флаг для создания БД
         """
         self.connection = sqlite3.connect(db_file_name)
         self.cursor = self.connection.cursor()
@@ -46,7 +49,6 @@ class Crawler:
 
     def dbinit(self) -> None:
         """Создаёт базу данных"""
-
         self.cursor.execute("""DROP TABLE IF EXISTS word_list;""")
         self.cursor.execute("""DROP TABLE IF EXISTS url_list;""")
         self.cursor.execute("""DROP TABLE IF EXISTS word_location;""")
@@ -103,4 +105,72 @@ class Crawler:
             max_depth: int - глубина поиска
         """
 
-cr = Crawler('temp.db', init_db=True)
+        for current_depth in range(max_depth):
+            print(f"{time.strftime('%H:%M:%S')}: Обход страниц: глубина {current_depth + 1}")
+            new_url_list = set()
+
+            for url in url_list:
+                print(f"{time.strftime('%H:%M:%S')}: Обход {url}")
+                try:
+                    res = requests.get(url, timeout=10)
+                    res.encoding = 'utf-8'
+                    print(f"{time.strftime('%H:%M:%S')}: 200 - Доступ к ресурсу {url} был получен")
+                except Exception as error:
+                    print(f"{time.strftime('%H:%M:%S')}: 400 - Не удалось получить доступ к ресурсу: {url}")
+                    print(error)
+                    continue
+
+                url_html = self.get_url_html(res.text)
+                url_text = self.get_url_text(url_html)
+                self.add_index(url_text, url)
+
+
+    def get_url_html(self, html_code: str) -> bs4.BeautifulSoup:
+        """
+        Парсит HTML-код, удаляет лишние тэги и возвращает готовый HTML-код
+
+        Параметры:
+            html_code: str - исходный HTML-код
+
+        Возвращаемые объекты:
+            soup: bs4.BeautifulSoup - HTML-код страницы без лишних тэгов
+        """
+        list_unwanted_items = ['head', 'script', 'noscript', 'img', 'header', 'meta', 'footer', 'button']
+        soup = BeautifulSoup(html_code, 'lxml')
+        for tag in soup.find_all(list_unwanted_items):
+            tag.decompose()
+
+        return soup
+
+    def get_url_text(self, soup: bs4.BeautifulSoup) -> list:
+        """
+        Получает текст страницы и возвращает его в виде списка
+
+        Параметры:
+            soup: bs4.BeautifulSoup - HTML-код страницы
+
+        Возвращаемые объекты:
+            text: list - список всех слов с страницы
+        """
+        text = []
+        for word in soup.text.split():
+            word = word.strip('«»—-().,!/\\\"\'!?#@:;*')
+            if not word.isdigit() and word:
+                text.append(word.lower())
+        print(f"{time.strftime('%H:%M:%S')}: Получен текст страницы")
+
+        return text
+
+    def add_index(self, url_text: list, url: str) -> None:
+        """
+        Индексирует страницу
+
+        Параметры:
+            url_text: str - текст страницы
+            url: str - адрес страницы
+        """
+
+
+cr = Crawler('temp.db')
+# cr.crawl(['https://habr.com/ru/news/779568/'])
+print(Crawler.__doc__)
